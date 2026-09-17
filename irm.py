@@ -28,7 +28,7 @@ def gen_states_q(n):
 
 # ---------------------------------------------------------------- parser
 
-TOKEN_RE = re.compile(r"\s*(\(|\)|\bor\b|\band\b|\bxor\b|\bnot\b|\bP\d+\b|\bhit\b|\bsome\b|\ball\b|[A-Z]+)")
+TOKEN_RE = re.compile(r"\s*(\(|\)|\bor\b|\band\b|\bxor\b|\bnot\b|\bP\d+\b|\bhit\b|\bsome\b|\bxsome\b|\ball\b|[A-Z]+)")
 
 def tokenize(msg):
     pos, toks = 0, []
@@ -86,6 +86,8 @@ class P:  # tiny recursive-descent parser
             q = self.next()
             if q == "some":
                 return ("some", player)
+            if q == "xsome":
+                return ("xsome", player)
             if q == "all":
                 return ("all", player)
             raise ValueError(f"expected some/all after {t}, got {q!r}")
@@ -104,6 +106,8 @@ def truth(ast, state):
         return ast[1] in s
     if op == "some":
         return state[ast[1]] in "SA"
+    if op == "xsome":
+        return state[ast[1]] == "S"
     if op == "all":
         return state[ast[1]] == "A"
     if op == "not":
@@ -119,7 +123,8 @@ def truth(ast, state):
 # ---------------------------------------------------------------- table
 
 DEFAULT_LEXICON = {"or": "or", "and": "and", "xor": "xor",
-                   "not": "not", "some": "some", "all": "all"}
+                   "not": "not", "some": "some", "xsome": "xsome",
+                   "all": "all"}
 
 def build_table(messages, states, lexicon=None):
     """table[si][mj] = P(message mj | state si).
@@ -306,13 +311,13 @@ def crd2():
     messages = ["A", "B", "A or B"]
     return states, messages 
 
-def dis2_xor():
+def dis2_la():
     letters = ["A", "B"]
     states = gen_states(letters)
     messages = ["A", "B", "A or B", "A xor B", "A and B"]
     return states, messages 
 
-def crd2_xor():
+def crd2_la():
     letters = ["A", "B"]
     states = gen_states(letters)
     messages = ["A", "B", "A or B", "A xor B"]
@@ -326,7 +331,7 @@ def dis3():
     "A or (B or C)", "A or (B and C)", "A and (B or C)", "A and (B and C)"]
     return states, messages
 
-def dis3_xor():
+def dis3_la():
     letters = ["A", "B", "C"]
     states = gen_states(letters)
     messages = ["A", "B", "C",
@@ -345,7 +350,7 @@ def crd3():
     messages = ["A", "B", "C", "A or B", "A or C", "B or C", "A or B or C"]
     return states, messages
 
-def crd3_xor():
+def crd3_la():
     letters = ["A", "B", "C"]
     states = gen_states(letters)
     messages = ["A", "B", "C",
@@ -360,11 +365,21 @@ def q1():
     messages = ["P1 hit some", "P1 hit all"]
     return states, messages
 
+def q1_la():
+    states = gen_states_q(1)
+    messages = ["P1 hit some", "P1 hit all", "P1 hit xsome"]
+    return states, messages
+
+def q1_lu():
+    states, messages = q1()
+    lexica = [{"some": "some", "all": "all"},   # L1: some = some
+              {"some": "xsome", "all": "all"}]   # L2: some = xsome
+    return states, messages, lexica
+
 def q2():
     states = gen_states_q(2)
     messages = ["P1 hit some", "P1 hit all", "P2 hit some", "P2 hit all"]
     return states, messages
-
 
 def crd2_lu():
     """crd2 with lexical uncertainty over 'or'."""
@@ -380,5 +395,7 @@ def crd3_lu():
     return states, messages, lexica
 
 if __name__ == "__main__":
-    states, messages, lexica = crd3_lu()
+    # states, messages = q1_la()
+    # main(states, messages)
+    states, messages, lexica = q1_lu()
     main_lu(states, messages, lexica)

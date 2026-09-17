@@ -118,13 +118,19 @@ def truth(ast, state):
 
 # ---------------------------------------------------------------- table
 
-def build_table(messages, states):
+DEFAULT_LEXICON = {"or": "or", "and": "and", "xor": "xor",
+                   "not": "not", "some": "some", "all": "all"}
+
+def build_table(messages, states, lexicon=None):
     """table[si][mj] = P(message mj | state si).
 
     1 if the state satisfies the message, else 0.
     Each state ROW is normalized evenly to sum to 1.
+    lexicon: optional mapping of operator tokens to operators
+    (e.g. {"or": "xor"}); defaults to the standard interpretation.
     """
-    asts = [parse(m) for m in messages]
+    lex = DEFAULT_LEXICON if lexicon is None else lexicon
+    asts = [P([lex.get(t, t) for t in tokenize(m)]).parse() for m in messages]
     table = []
     for s in states:
         row = [1.0 if truth(ast, s) else 0.0 for ast in asts]
@@ -259,6 +265,33 @@ def main(states, messages):
     if not ids:
         print("  (none)")
 
+def main_lu(states, messages, lexica):
+    """IRM with lexical uncertainty: build a table per lexicon, average
+    them cell-wise, then run the usual peeling on the averaged table."""
+    tables = []
+    for k, lex in enumerate(lexica, 1):
+        t = build_table(messages, states, lex)
+        tables.append(t)
+        print(BOLD + f"Lexicon L{k}: {lex}" + RESET)
+        print_table(states, messages, t)
+
+    avg = [[sum(t[i][j] for t in tables) / len(tables)
+            for j in range(len(messages))]
+           for i in range(len(states))]
+    print(BOLD + "Averaged probability table over lexica:" + RESET)
+    print_table(states, messages, avg)
+
+    ids, marks = match(messages, states, avg)
+
+    print(BOLD + "Final table with identifications marked:" + RESET)
+    print_table(states, messages, avg, marks=marks)
+
+    print(BOLD + "All identifications:" + RESET)
+    for round, s, m, p in ids:
+        print(f"  iter {round}: {m!r} <-> state {s} (p={p:.2f})")
+    if not ids:
+        print("  (none)")
+
 # ---------------------------------------------------------------- tests
 
 def dis2():
@@ -312,6 +345,16 @@ def crd3():
     messages = ["A", "B", "C", "A or B", "A or C", "B or C", "A or B or C"]
     return states, messages
 
+def crd3_xor():
+    letters = ["A", "B", "C"]
+    states = gen_states(letters)
+    messages = ["A", "B", "C",
+    "A or B", "A xor B",
+    "A or C", "A xor C",
+    "B or C", "B xor C",
+    "A or B or C", "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)"]
+    return states, messages
+
 def q1():
     states = gen_states_q(1)
     messages = ["P1 hit some", "P1 hit all"]
@@ -323,6 +366,19 @@ def q2():
     return states, messages
 
 
+def crd2_lu():
+    """crd2 with lexical uncertainty over 'or'."""
+    states, messages = crd2()
+    lexica = [{"or": "or", "and": "and"},   # L1: or = or
+              {"or": "xor", "and": "and"}]  # L2: or = xor
+    return states, messages, lexica
+
+def crd3_lu():
+    states, messages = crd3()
+    lexica = [{"or": "or", "and": "and"},   # L1: or = or
+              {"or": "xor", "and": "and"}]  # L2: or = xor
+    return states, messages, lexica
+
 if __name__ == "__main__":
-    states, messages = q1()
-    main(states, messages)
+    states, messages, lexica = crd3_lu()
+    main_lu(states, messages, lexica)

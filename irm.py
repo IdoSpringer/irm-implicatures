@@ -499,11 +499,12 @@ def elipsis():
     states = gen_states_q(2)
     # we need lexical identity foe elipsis
     # regular irm works however not sure we have all messages to create probability equality in column 
-    messages = ["P1 hit some", "P1 hit all", "P2 hit some", "P2 hit all",
-                "not (P1 hit some)", "not (P1 hit all)", "not (P2 hit some)", "not (P2 hit all)",
+    messages = ["P1 hit some", "P1 hit all",
+                "not (P2 hit some)", "P2 hit some", "not (P2 hit all)", "P2 hit all",
                 "P1 hit some and P2 hit some", "P1 hit all and P2 hit all",
                 "P1 hit some or P2 hit some", "P1 hit all or P2 hit all",
-                "P1 hit some and not (P2 hit some)", "P1 hit all and not (P2 hit all)",]
+                "P1 hit some or not (P2 hit some)", "P1 hit all or not (P2 hit all)",
+                "P1 hit some and not (P2 hit some)", "P1 hit all and not (P2 hit all)"]
     return states, messages
 
 def elipsis_lu():

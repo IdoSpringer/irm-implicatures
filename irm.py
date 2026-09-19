@@ -98,6 +98,31 @@ class P:  # tiny recursive-descent parser
 def parse(msg):
     return P(tokenize(msg)).parse()
 
+# ---------------------------------------------------------------- complex states
+
+SYM_RE = re.compile(r"\^|\||~")
+
+def state_worlds(spec, letters):
+    """A state spec denotes a set of worlds (each a frozenset of letters).
+
+    Legacy string states like "AB" -> the single world {A, B}.
+    Formula states like "(A ^ ~B) | (B ^ ~A)" (or with word operators
+    and/or/not) -> all worlds over `letters` where the formula is true.
+    """
+    if spec and all(c.isalpha() and c.isupper() for c in spec):
+        return [frozenset(spec)]
+    # map symbolic operators (states only): ^ and, | or, ~ not
+    spec = SYM_RE.sub(lambda m: " %s " % {"^": "and", "|": "or", "~": "not"}[m.group(0)], spec)
+    ast = parse(spec)
+    return [frozenset(combo)
+            for r in range(len(letters) + 1)
+            for combo in itertools.combinations(letters, r)
+            if truth(ast, frozenset(combo))]
+
+def satisfies(ast, worlds):
+    """Does the state (set of worlds) entail the formula?"""
+    return all(truth(ast, w) for w in worlds)
+
 def truth(ast, state):
     """Is the phrase true in the state? A letter is true iff present."""
     s = truth_state(state)
@@ -126,23 +151,38 @@ DEFAULT_LEXICON = {"or": "or", "and": "and", "xor": "xor",
                    "not": "not", "some": "some", "xsome": "xsome",
                    "all": "all"}
 
-def build_table(messages, states, lexicon=None):
+def build_table(messages, states, lexicon=None, letters=None):
     """table[si][mj] = P(message mj | state si).
 
     1 if the state satisfies the message, else 0.
     Each state ROW is normalized evenly to sum to 1.
     lexicon: optional mapping of operator tokens to operators
     (e.g. {"or": "xor"}); defaults to the standard interpretation.
+    letters: universe for complex formula states; defaults to all letters
+    appearing in any message or state.
     """
     lex = DEFAULT_LEXICON if lexicon is None else lexicon
     asts = [P([lex.get(t, t) for t in tokenize(m)]).parse() for m in messages]
-    table = []
-    for s in states:
-        row = [1.0 if truth(ast, s) else 0.0 for ast in asts]
+    if letters is None:
+        letters = sorted({t for m in messages for t in tokenize(m)
+                          if t.isalpha() and t.isupper() and len(t) == 1}
+                         | {c for s in states for c in s
+                            if c.isalpha() and c.isupper()} - set("NSA"))
+
+    def has_q(ast):
+        if ast[0] in ("some", "xsome", "all"):
+            return True
+        return any(has_q(x) for x in ast[1:] if isinstance(x, tuple))
+
+    if any(has_q(a) for a in asts):          # quantifier messages/states
+        table = [[1.0 if truth(ast, s) else 0.0 for ast in asts] for s in states]
+    else:                                    # propositional states = world sets
+        table = [[1.0 if satisfies(ast, state_worlds(s, letters)) else 0.0
+                  for ast in asts] for s in states]
+    for row in table:
         total = sum(row)
         if total > 0:
-            row = [v / total for v in row]
-        table.append(row)
+            row[:] = [v / total for v in row]
     return table
 
 # ---------------------------------------------------------------- printing
@@ -299,58 +339,79 @@ def main_lu(states, messages, lexica):
 
 # ---------------------------------------------------------------- tests
 
-def dis2():
+# deriving exclusive or
+
+def dis2_naive():
+    # irm fails
     letters = ["A", "B"]
     states = gen_states(letters)
     messages = ["A", "B", "A or B", "A and B"]
     return states, messages
 
-def crd2():
+def dis2():
+    # irm succeeds
     letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B"]
-    return states, messages 
-
-def dis2_la():
-    letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B", "A xor B", "A and B"]
-    return states, messages 
-
-def crd2_la():
-    letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B", "A xor B"]
+    states = ["A^~B", "B^~A", "A^B", "(A^~B)|(B^~A)"]
+    messages = ["A", "B", "A or B", "A and B"]
     return states, messages
 
 def dis3():
+    # irm succeeds
     letters = ["A", "B", "C"]
-    states = gen_states(letters)
+    states = ["A^~B^~C", "B^~A^~C", "C^~A^~B",
+            "A^B^~C", "A^C^~B", "B^C^~A",
+            "A^B^C",
+            "(A^~B^~C)|(B^~A^~C)|(C^~A^~B)"]
     messages = ["A", "B", "C",
     "A or B", "A and B", "A or C", "A and C", "B or C", "B and C",
     "A or (B or C)", "A or (B and C)", "A and (B or C)", "A and (B and C)"]
     return states, messages
 
-def dis3_la():
-    letters = ["A", "B", "C"]
+def dis2_la():
+    # irm-la fails? both or and xor identify the same
+    states, messages = dis2()
+    messages += ["A xor B"]
+    return states, messages 
+
+def dis2_lu():
+    # irm-lu succeeds
+    states, messages = dis2()
+    lexica = [{"or": "or", "and": "and"},
+              {"or": "xor", "and": "and"}]
+    return states, messages, lexica
+
+# conjuctive reading of disjunctions
+
+def crd2():
+    # irm succeeds
+    letters = ["A", "B"]
     states = gen_states(letters)
-    messages = ["A", "B", "C",
-    "A or B", "A and B", "A xor B",
-    "A or C", "A and C", "A xor C",
-    "B or C", "B and C", "B xor C",
-    "A or (B or C)", "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)",
-    "A or (B and C)", "A xor (B and C)",
-    "A and (B or C)", "A and (B xor C)",
-    "A and (B and C)"]
+    messages = ["A", "B", "A or B"]
+    return states, messages 
+
+def crd2_la():
+    # irm-la fails
+    letters = ["A", "B"]
+    states = gen_states(letters)
+    messages = ["A", "B", "A or B", "A xor B"]
     return states, messages
 
+def crd2_lu():
+    # irm-lu succeeds
+    states, messages = crd2()
+    lexica = [{"or": "or", "and": "and"},   # L1: or = or
+              {"or": "xor", "and": "and"}]  # L2: or = xor
+    return states, messages, lexica
+
 def crd3():
+    # irm fails
     letters = ["A", "B", "C"]
     states = gen_states(letters)
     messages = ["A", "B", "C", "A or B", "A or C", "B or C", "A or B or C"]
     return states, messages
 
 def crd3_la():
+    # irm-la fails
     letters = ["A", "B", "C"]
     states = gen_states(letters)
     messages = ["A", "B", "C",
@@ -360,17 +421,29 @@ def crd3_la():
     "A or B or C", "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)"]
     return states, messages
 
+def crd3_lu():
+    # irm-lu fails
+    states, messages = crd3()
+    lexica = [{"or": "or", "and": "and"},   # L1: or = or
+              {"or": "xor", "and": "and"}]  # L2: or = xor
+    return states, messages, lexica
+
+# some but not all
+
 def q1():
+    # irm succeeds
     states = gen_states_q(1)
     messages = ["P1 hit some", "P1 hit all"]
     return states, messages
 
 def q1_la():
+    # irm-la suceeds (but in a different way than q1)
     states = gen_states_q(1)
     messages = ["P1 hit some", "P1 hit all", "P1 hit xsome"]
     return states, messages
 
 def q1_lu():
+    # irm-lu succeeds
     states, messages = q1()
     lexica = [{"some": "some", "all": "all"},   # L1: some = some
               {"some": "xsome", "all": "all"}]   # L2: some = xsome
@@ -381,21 +454,15 @@ def q2():
     messages = ["P1 hit some", "P1 hit all", "P2 hit some", "P2 hit all"]
     return states, messages
 
-def crd2_lu():
-    """crd2 with lexical uncertainty over 'or'."""
-    states, messages = crd2()
-    lexica = [{"or": "or", "and": "and"},   # L1: or = or
-              {"or": "xor", "and": "and"}]  # L2: or = xor
+def q2_lu():
+    states, messages = q2()
+    lexica = [{"some": "some", "all": "all"},
+              {"some": "xsome", "all": "all"}]
     return states, messages, lexica
 
-def crd3_lu():
-    states, messages = crd3()
-    lexica = [{"or": "or", "and": "and"},   # L1: or = or
-              {"or": "xor", "and": "and"}]  # L2: or = xor
-    return states, messages, lexica
 
 if __name__ == "__main__":
-    # states, messages = q1_la()
+    # states, messages = q2()
     # main(states, messages)
-    states, messages, lexica = q1_lu()
+    states, messages, lexica = q2_lu()
     main_lu(states, messages, lexica)

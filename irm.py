@@ -380,6 +380,19 @@ def dis2_lu():
               {"or": "xor", "and": "and"}]
     return states, messages, lexica
 
+def dis3_la():
+    states, messages = dis3()
+    messages += ["A xor B", "A xor C", "B xor C",
+                 "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)",
+                 "A xor (B and C)", "A and (B xor C)"]
+    return states, messages
+
+def dis3_lu():
+    states, messages = dis3()
+    lexica = [{"or": "or", "and": "and"},
+              {"or": "xor", "and": "and"}]
+    return states, messages, lexica
+
 # conjuctive reading of disjunctions
 
 def crd2():
@@ -460,9 +473,28 @@ def q2_lu():
               {"some": "xsome", "all": "all"}]
     return states, messages, lexica
 
+# disjuction under negation
+
+def neg_dis():
+    # rim works; however comaring to frischoff there might be a bug here
+    states = ["~A^~B", "A^~B", "B^~A", "(A^~B)|(B^~A)"]
+    messages = ["not A", "not B", "not (A or B)", "not (A and B)"]
+    return states, messages
+
+def neg_dis_la():
+    # again we have the same double identification problem
+    states, messages = neg_dis()
+    messages += ["not (A xor B)"]
+    return states, messages
+
+def neg_dis_lu():
+    states, messages = neg_dis()
+    lexica = [{"or": "or", "and": "and"},
+              {"or": "xor", "and": "and"}]
+    return states, messages, lexica
 
 if __name__ == "__main__":
-    # states, messages = q2()
+    # states, messages = dis3_la()
     # main(states, messages)
-    states, messages, lexica = q2_lu()
+    states, messages, lexica = dis3_lu()
     main_lu(states, messages, lexica)

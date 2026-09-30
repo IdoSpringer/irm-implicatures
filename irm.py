@@ -8,6 +8,7 @@ Messages are logical phrases like "A or B", "A and C".
 import itertools
 import re
 import sys
+from fractions import Fraction
 
 # ---------------------------------------------------------------- states
 
@@ -175,15 +176,22 @@ def build_table(messages, states, lexicon=None, letters=None):
         return any(has_q(x) for x in ast[1:] if isinstance(x, tuple))
 
     if any(has_q(a) for a in asts):          # quantifier messages/states
-        table = [[1.0 if truth(ast, s) else 0.0 for ast in asts] for s in states]
+        table = [[Fraction(1) if truth(ast, s) else Fraction(0) for ast in asts] for s in states]
     else:                                    # propositional states = world sets
-        table = [[1.0 if satisfies(ast, state_worlds(s, letters)) else 0.0
+        table = [[Fraction(1) if satisfies(ast, state_worlds(s, letters)) else Fraction(0)
                   for ast in asts] for s in states]
     for row in table:
         total = sum(row)
         if total > 0:
             row[:] = [v / total for v in row]
     return table
+
+def avg_tables(tables):
+    """Cell-wise average of several tables (exact Fractions)."""
+    n = len(tables)
+    return [[sum(t[i][j] for t in tables) / n
+             for j in range(len(tables[0][0]) if tables else 0)]
+            for i in range(len(tables[0]) if tables else 0)]
 
 # ---------------------------------------------------------------- printing
 
@@ -223,7 +231,7 @@ def print_table(rows, cols, table, color="", marks=None,
                 kind, rnd = marks[(gi, gj)]
                 star = "*" if kind == "id" else " "
                 cell = color_for(kind, rnd) if kind == "id" else color_for("out", rnd)
-            cells.append(cell + f"{v:>{w-1}.2f}{star}" + RESET)
+            cells.append(cell + f"{float(v):>{w-1}.2f}{star}" + RESET)
         print(color + r.ljust(6) + RESET + "".join(cells))
     print()
 
@@ -277,7 +285,7 @@ def match(messages, states, table, verbose=True):
             identifications.append((round, states[i], messages[j], p))
             id_s.add(i); id_m.add(j)
             if verbose:
-                print(color + f"  identified: {messages[j]!r} <-> state {states[i]} (p={p:.2f})" + RESET)
+                print(color + f"  identified: {messages[j]!r} <-> state {states[i]} (p={float(p):.2f})" + RESET)
         # mark exact matched cells, and the rest of their rows/columns as ruled out
         for j, (p, i) in pairs.items():
             marks[(i, j)] = ("id", round)
@@ -306,7 +314,7 @@ def main(states, messages):
 
     print(BOLD + "All identifications:" + RESET)
     for round, s, m, p in ids:
-        print(f"  iter {round}: {m!r} <-> state {s} (p={p:.2f})")
+        print(f"  iter {round}: {m!r} <-> state {s} (p={float(p):.2f})")
     if not ids:
         print("  (none)")
 
@@ -320,9 +328,7 @@ def main_lu(states, messages, lexica):
         print(BOLD + f"Lexicon L{k}: {lex}" + RESET)
         print_table(states, messages, t)
 
-    avg = [[sum(t[i][j] for t in tables) / len(tables)
-            for j in range(len(messages))]
-           for i in range(len(states))]
+    avg = avg_tables(tables)
     print(BOLD + "Averaged probability table over lexica:" + RESET)
     print_table(states, messages, avg)
 
@@ -333,188 +339,7 @@ def main_lu(states, messages, lexica):
 
     print(BOLD + "All identifications:" + RESET)
     for round, s, m, p in ids:
-        print(f"  iter {round}: {m!r} <-> state {s} (p={p:.2f})")
+        print(f"  iter {round}: {m!r} <-> state {s} (p={float(p):.2f})")
     if not ids:
         print("  (none)")
 
-# ---------------------------------------------------------------- tests
-
-# deriving exclusive or
-
-def dis2_naive():
-    # irm fails
-    letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B", "A and B"]
-    return states, messages
-
-def dis2():
-    # irm succeeds
-    letters = ["A", "B"]
-    states = ["A^~B", "B^~A", "A^B", "(A^~B)|(B^~A)"]
-    messages = ["A", "B", "A or B", "A and B"]
-    return states, messages
-
-def dis3():
-    # irm succeeds
-    letters = ["A", "B", "C"]
-    states = ["A^~B^~C", "B^~A^~C", "C^~A^~B",
-            "A^B^~C", "A^C^~B", "B^C^~A",
-            "A^B^C",
-            "(A^~B^~C)|(B^~A^~C)|(C^~A^~B)"]
-    messages = ["A", "B", "C",
-    "A or B", "A and B", "A or C", "A and C", "B or C", "B and C",
-    "A or (B or C)", "A or (B and C)", "A and (B or C)", "A and (B and C)"]
-    return states, messages
-
-def dis2_la():
-    # irm-la fails? both or and xor identify the same
-    states, messages = dis2()
-    messages += ["A xor B"]
-    return states, messages 
-
-def dis2_lu():
-    # irm-lu succeeds
-    states, messages = dis2()
-    lexica = [{"or": "or", "and": "and"},
-              {"or": "xor", "and": "and"}]
-    return states, messages, lexica
-
-def dis3_la():
-    states, messages = dis3()
-    messages += ["A xor B", "A xor C", "B xor C",
-                 "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)",
-                 "A xor (B and C)", "A and (B xor C)"]
-    return states, messages
-
-def dis3_lu():
-    states, messages = dis3()
-    lexica = [{"or": "or", "and": "and"},
-              {"or": "xor", "and": "and"}]
-    return states, messages, lexica
-
-# conjuctive reading of disjunctions
-
-def crd2():
-    # irm succeeds
-    letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B"]
-    return states, messages 
-
-def crd2_la():
-    # irm-la fails
-    letters = ["A", "B"]
-    states = gen_states(letters)
-    messages = ["A", "B", "A or B", "A xor B"]
-    return states, messages
-
-def crd2_lu():
-    # irm-lu succeeds
-    states, messages = crd2()
-    lexica = [{"or": "or", "and": "and"},   # L1: or = or
-              {"or": "xor", "and": "and"}]  # L2: or = xor
-    return states, messages, lexica
-
-def crd3():
-    # irm fails
-    letters = ["A", "B", "C"]
-    states = gen_states(letters)
-    messages = ["A", "B", "C", "A or B", "A or C", "B or C", "A or B or C"]
-    return states, messages
-
-def crd3_la():
-    # irm-la fails
-    letters = ["A", "B", "C"]
-    states = gen_states(letters)
-    messages = ["A", "B", "C",
-    "A or B", "A xor B",
-    "A or C", "A xor C",
-    "B or C", "B xor C",
-    "A or B or C", "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)"]
-    return states, messages
-
-def crd3_lu():
-    # irm-lu fails
-    states, messages = crd3()
-    lexica = [{"or": "or", "and": "and"},   # L1: or = or
-              {"or": "xor", "and": "and"}]  # L2: or = xor
-    return states, messages, lexica
-
-# some but not all
-
-def q1():
-    # irm succeeds
-    states = gen_states_q(1)
-    messages = ["P1 hit some", "P1 hit all"]
-    return states, messages
-
-def q1_la():
-    # irm-la suceeds (but in a different way than q1)
-    states = gen_states_q(1)
-    messages = ["P1 hit some", "P1 hit all", "P1 hit xsome"]
-    return states, messages
-
-def q1_lu():
-    # irm-lu succeeds
-    states, messages = q1()
-    lexica = [{"some": "some", "all": "all"},   # L1: some = some
-              {"some": "xsome", "all": "all"}]   # L2: some = xsome
-    return states, messages, lexica
-
-def q2():
-    states = gen_states_q(2)
-    messages = ["P1 hit some", "P1 hit all", "P2 hit some", "P2 hit all"]
-    return states, messages
-
-def q2_lu():
-    states, messages = q2()
-    lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
-    return states, messages, lexica
-
-# disjuction under negation
-
-def neg_dis():
-    # rim works; however comaring to frischoff there might be a bug here
-    states = ["~A^~B", "A^~B", "B^~A", "(A^~B)|(B^~A)"]
-    messages = ["not A", "not B", "not (A or B)", "not (A and B)"]
-    return states, messages
-
-def neg_dis_la():
-    # again we have the same double identification problem
-    states, messages = neg_dis()
-    messages += ["not (A xor B)"]
-    return states, messages
-
-def neg_dis_lu():
-    states, messages = neg_dis()
-    lexica = [{"or": "or", "and": "and"},
-              {"or": "xor", "and": "and"}]
-    return states, messages, lexica
-
-# elipsis
-
-def elipsis():
-    states = gen_states_q(2)
-    # we need lexical identity foe elipsis
-    # regular irm works however not sure we have all messages to create probability equality in column 
-    messages = ["P1 hit some", "P1 hit all",
-                "not (P2 hit some)", "P2 hit some", "not (P2 hit all)", "P2 hit all",
-                "P1 hit some and P2 hit some", "P1 hit all and P2 hit all",
-                "P1 hit some or P2 hit some", "P1 hit all or P2 hit all",
-                "P1 hit some or not (P2 hit some)", "P1 hit all or not (P2 hit all)",
-                "P1 hit some and not (P2 hit some)", "P1 hit all and not (P2 hit all)"]
-    return states, messages
-
-def elipsis_lu():
-    states, messages = elipsis()
-    lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
-    return states, messages, lexica
-
-if __name__ == "__main__":
-    states, messages = elipsis()
-    main(states, messages)
-    # states, messages, lexica = elipsis_lu()
-    # main_lu(states, messages, lexica)

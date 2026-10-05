@@ -130,9 +130,10 @@ def q1_lu():
     # irm-lu succeeds
     states, messages = q1()
     lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
-            #   last lexicon has 0 proba
-            #   {"some": "all", "all": "all"}]
+              {"some": "xsome", "all": "all"},
+              {"some": "all", "all": "all"}]
+            #   last lexicon cannot express the some-but-not-all state,
+            #   so it drops out of that row automatically
     return states, messages, lexica
 
 def q2():
@@ -203,8 +204,8 @@ def suspension_lu():
     states, messages = q1()
     messages = ["P1 hit some", "P1 hit all", "P1 hit some and P1 hit all"]
     lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
-            #   {"some": "all", "all": "all"}]
+              {"some": "xsome", "all": "all"},
+              {"some": "all", "all": "all"}]
     return states, messages, lexica
 
 # negation
@@ -219,12 +220,14 @@ def neg_q1_lu():
     states, messages = q1()
     messages = ["P1 hit some", "P1 hit all", "not (P1 hit some)", "not (P1 hit all)"]
     lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
-            #   {"some": "all", "all": "all"}]
+              {"some": "xsome", "all": "all"},
+              {"some": "all", "all": "all"}]
     return states, messages, lexica
 
-def dump_latex():                                                                                                                                                                                        
-      to_latex(q1(), out_path='q1.tex')                 
+# def dump_latex():                                                                                                                                                                                        
+    #   to_latex(q1(), out_path='q1.tex')
+    # to_latex(suspension_lu(), out_path='suspension_lu.tex')
+                      
 
 if __name__ == "__main__":
     # states, messages = neg_dis()
@@ -232,10 +235,11 @@ if __name__ == "__main__":
     # main(states, messages)
     
     # states, messages, lexica = q1_lu()
-    # states, messages, lexica = suspension_lu()
-    states, messages, lexica = neg_q1_lu()
+    states, messages, lexica = suspension_lu()
+    # states, messages, lexica = neg_q1_lu()
     # states, messages, lexica = neg_dis_lu()
     main_lu(states, messages, lexica)
-    # logical_exp_order()
+    to_latex(suspension_lu(), out_path='suspension_lu.tex')
     
+    # logical_exp_order()    
     # dump_latex()

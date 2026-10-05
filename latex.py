@@ -78,8 +78,9 @@ def to_latex(result, caption=None, label=None, out_path=None):
     """Render a test's result as a LaTeX table (Frischhoff-2025 style).
 
     result: (states, messages) or (states, messages, lexica).
-    For lexica, tables are built per lexicon and averaged cell-wise,
-    then the usual peeling runs on the averaged table.
+    For lexica, tables are built per lexicon and averaged row-wise with
+    p(L|t) uniform over lexica that can express t, then the usual
+    peeling runs on the averaged table.
     Returns the \\begin{table}...\\end{table} block (with \\definecolor
     lines for the used colors); writes to out_path if given.
     """

@@ -187,11 +187,18 @@ def build_table(messages, states, lexicon=None, letters=None):
     return table
 
 def avg_tables(tables):
-    """Cell-wise average of several tables (exact Fractions)."""
-    n = len(tables)
-    return [[sum(t[i][j] for t in tables) / n
-             for j in range(len(tables[0][0]) if tables else 0)]
-            for i in range(len(tables[0]) if tables else 0)]
+    """p(m|t) = sum_L p(m|t,L) p(L|t), with p(L|t) uniform over lexica
+    that can express t (non-zero row) and 0 otherwise. Rows no lexicon
+    can express stay all-zero."""
+    out = []
+    for rows in zip(*tables):                   # same state across lexica
+        live = [r for r in rows if sum(r) > 0]  # lexica that express t
+        if live:
+            n = Fraction(len(live))
+            out.append([sum(r[j] for r in live) / n for j in range(len(rows[0]))])
+        else:
+            out.append([Fraction(0)] * len(rows[0]))
+    return out
 
 # ---------------------------------------------------------------- printing
 
@@ -319,8 +326,9 @@ def main(states, messages):
         print("  (none)")
 
 def main_lu(states, messages, lexica):
-    """IRM with lexical uncertainty: build a table per lexicon, average
-    them cell-wise, then run the usual peeling on the averaged table."""
+    """IRM with lexical uncertainty: build a table per lexicon, then
+    average rows with p(L|t) uniform over lexica that can express t,
+    then run the usual peeling on the averaged table."""
     tables = []
     for k, lex in enumerate(lexica, 1):
         t = build_table(messages, states, lex)
@@ -329,7 +337,7 @@ def main_lu(states, messages, lexica):
         print_table(states, messages, t)
 
     avg = avg_tables(tables)
-    print(BOLD + "Averaged probability table over lexica:" + RESET)
+    print(BOLD + "Averaged table, p(L|t) uniform over lexica that express t:" + RESET)
     print_table(states, messages, avg)
 
     ids, marks = match(messages, states, avg)

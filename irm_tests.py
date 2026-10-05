@@ -130,8 +130,9 @@ def q1_lu():
     # irm-lu succeeds
     states, messages = q1()
     lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"},
-              {"some": "all", "all": "all"}]
+              {"some": "xsome", "all": "all"}]
+            #   last lexicon has 0 proba
+            #   {"some": "all", "all": "all"}]
     return states, messages, lexica
 
 def q2():
@@ -148,7 +149,7 @@ def q2_lu():
 # disjuction under negation
 
 def neg_dis():
-    # rim works; however comaring to frischoff there might be a bug here
+    # irm works; however comaring to frischoff there might be a bug here
     states = ["~A^~B", "A^~B", "B^~A", "(A^~B)|(B^~A)"]
     messages = ["not A", "not B", "not (A or B)", "not (A and B)"]
     return states, messages
@@ -162,7 +163,8 @@ def neg_dis_la():
 def neg_dis_lu():
     states, messages = neg_dis()
     lexica = [{"or": "or", "and": "and"},
-              {"or": "xor", "and": "and"}]
+              {"or": "xor", "and": "and"},
+              {"or": "and", "and": "and"}]
     return states, messages, lexica
 
 # elipsis
@@ -195,13 +197,45 @@ def logical_exp_order():
     states, messages, lexica = q1_lu()
     main_lu(states, messages, lexica)
 
+# suspension
+
+def suspension_lu():
+    states, messages = q1()
+    messages = ["P1 hit some", "P1 hit all", "P1 hit some and P1 hit all"]
+    lexica = [{"some": "some", "all": "all"},
+              {"some": "xsome", "all": "all"}]
+            #   {"some": "all", "all": "all"}]
+    return states, messages, lexica
+
+# negation
+
+def neg_q1():
+    states, messages = q1()
+    messages = ["P1 hit some", "P1 hit all", "not (P1 hit some)", "not (P1 hit all)"]
+    return states, messages
+
+
+def neg_q1_lu():
+    states, messages = q1()
+    messages = ["P1 hit some", "P1 hit all", "not (P1 hit some)", "not (P1 hit all)"]
+    lexica = [{"some": "some", "all": "all"},
+              {"some": "xsome", "all": "all"}]
+            #   {"some": "all", "all": "all"}]
+    return states, messages, lexica
+
 def dump_latex():                                                                                                                                                                                        
       to_latex(q1(), out_path='q1.tex')                 
 
 if __name__ == "__main__":
-    # states, messages = elipsis()
+    # states, messages = neg_dis()
+    # states, messages = neg_q1()
     # main(states, messages)
-    # states, messages, lexica = elipsis_lu()
-    # main_lu(states, messages, lexica)
+    
+    # states, messages, lexica = q1_lu()
+    # states, messages, lexica = suspension_lu()
+    states, messages, lexica = neg_q1_lu()
+    # states, messages, lexica = neg_dis_lu()
+    main_lu(states, messages, lexica)
     # logical_exp_order()
-    dump_latex()
+    
+    # dump_latex()

@@ -8,43 +8,23 @@ Run the demo with: python3 irm_tests.py
 from irm import gen_states, gen_states_q, main, main_lu
 from latex import to_latex
 
+# basic inference: some but not all
 
-# deriving exclusive or
+def q1():
+    # irm succeeds
+    states = gen_states_q(1)
+    messages = ["P1 hit some", "P1 hit all"]
+    return states, messages
 
-# def dis2_naive():
-#     # irm fails
-#     letters = ["A", "B"]
-#     states = gen_states(letters)
-#     messages = ["A", "B", "A or B", "A and B"]
-#     return states, messages
-
-# def dis2():
-#     # irm succeeds
-#     letters = ["A", "B"]
-#     states = ["A^~B", "B^~A", "A^B", "(A^~B)|(B^~A)"]
-#     messages = ["A", "B", "A or B", "A and B"]
-#     return states, messages
-
-# def dis2_la():
-#     # irm-la fails? both or and xor identify the same
-#     states, messages = dis2()
-#     messages += ["A xor B"]
-#     return states, messages
-
-# def dis2_lu():
-#     # irm-lu succeeds
-#     states, messages = dis2()
-#     lexica = [{"or": "or", "and": "and"},
-#               {"or": "xor", "and": "and"}]
-#     return states, messages, lexica
-
-# def dis3_la():
-#     states, messages = dis3()
-#     messages += ["A xor B", "A xor C", "B xor C",
-#                  "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)",
-#                  "A xor (B and C)", "A and (B xor C)"]
-#     return states, messages
-
+def q1_lu():
+    # irm-lu succeeds
+    states, messages = q1()
+    lexica = [{"some": "some", "all": "all"},
+              {"some": "xsome", "all": "all"},
+              {"some": "all", "all": "all"}]
+            #   last lexicon cannot express the some-but-not-all state,
+            #   so it drops out of that row automatically
+    return states, messages, lexica
 
 # conjuctive reading of disjunctions
 
@@ -84,41 +64,6 @@ def crd3_lu():
               {"or": "xor", "and": "and"},
               {"or": "and", "and": "and"}]
     return states, messages, lexica
-
-# basic inference: some but not all
-
-def q1():
-    # irm succeeds
-    states = gen_states_q(1)
-    messages = ["P1 hit some", "P1 hit all"]
-    return states, messages
-
-# def q1_la():
-#     # irm-la suceeds (but in a different way than q1)
-#     states = gen_states_q(1)
-#     messages = ["P1 hit some", "P1 hit all", "P1 hit xsome"]
-#     return states, messages
-
-def q1_lu():
-    # irm-lu succeeds
-    states, messages = q1()
-    lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"},
-              {"some": "all", "all": "all"}]
-            #   last lexicon cannot express the some-but-not-all state,
-            #   so it drops out of that row automatically
-    return states, messages, lexica
-
-# def q2():
-#     states = gen_states_q(2)
-#     messages = ["P1 hit some", "P1 hit all", "P2 hit some", "P2 hit all"]
-#     return states, messages
-
-# def q2_lu():
-#     states, messages = q2()
-#     lexica = [{"some": "some", "all": "all"},
-#               {"some": "xsome", "all": "all"}]
-#     return states, messages, lexica
 
 # suspension
 
@@ -214,12 +159,24 @@ def dis3_lu():
               {"or": "and", "and": "and"}]
     return states, messages, lexica
 
-def or_some():
-    messages = ["B", "some", "all", "B or some", "B or all", "B and some", "B and all"]
-    # messages = ["B or some", "B or all", "B and some", "B and all"]
+def or_some_fc():
+    messages = ["B", "some", "all", "B or some", "B or all"]
     states = ["B and none", "B and xsome", "B and all",
-    "(not B) and none", "(not B) and xsome", "(not B) and all"]
+            "(not B) and none", "(not B) and xsome", "(not B) and all"]
     return states, messages
+
+def or_some_fc_lu():
+    states, messages = or_some_fc()
+    lexica = [{"or": "or", "and": "and", "some": "some", "all": "all"},
+              {"or": "xor", "and": "and", "some": "some", "all": "all"},
+              {"or": "and", "and": "and", "some": "some", "all": "all"},
+              {"or": "or", "and": "and", "some": "xsome", "all": "all"},
+              {"or": "xor", "and": "and", "some": "xsome", "all": "all"},
+              {"or": "and", "and": "and", "some": "xsome", "all": "all"},
+              {"or": "or", "and": "and", "some": "all", "all": "all"},
+              {"or": "xor", "and": "and", "some": "all", "all": "all"},
+              {"or": "and", "and": "and", "some": "all", "all": "all"}]
+    return states, messages, lexica
 
 # elipsis
 
@@ -247,7 +204,7 @@ if __name__ == "__main__":
     # states, messages = neg_q1()
     # states, messages = neg_fc3()
     # states, messages = dis3()
-    # states, messages = or_some()
+    # states, messages = or_some_fc()
     # states, messages = crd2_la()
     
     # main(states, messages)
@@ -261,8 +218,9 @@ if __name__ == "__main__":
     # states, messages, lexica = dis3_lu()
     # states, messages, lexica = crd2_lu()
     # states, messages, lexica = crd3_lu()
+    states, messages, lexica = or_some_fc_lu()
 
-    # main_lu(states, messages, lexica)
+    main_lu(states, messages, lexica)
     
     # to_latex(suspension_lu(), out_path='suspension_lu.tex')
     # to_latex(neg_q1_lu(), out_path='neg_q1_lu.tex')
@@ -270,3 +228,7 @@ if __name__ == "__main__":
     # to_latex(neg_fc_lu(), out_path='neg_fc_lu.tex')
     # to_latex(crd2_lu(), out_path='crd2_lu.tex')
     # to_latex(crd3_lu(), out_path='crd3_lu.tex')
+    # to_latex(crd2_la(), out_path='crd2_la.tex')
+    # to_latex(or_some_fc(), out_path='or_some_fc.tex')
+    # to_latex(or_some_fc_lu(), out_path='or_some_fc_lu.tex')
+

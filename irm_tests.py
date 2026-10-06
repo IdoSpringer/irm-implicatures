@@ -8,7 +8,6 @@ Run the demo with: python3 irm_tests.py
 from irm import gen_states, gen_states_q, main, main_lu
 from latex import to_latex
 
-# ---------------------------------------------------------------- tests
 
 # deriving exclusive or
 
@@ -25,8 +24,6 @@ from latex import to_latex
 #     states = ["A^~B", "B^~A", "A^B", "(A^~B)|(B^~A)"]
 #     messages = ["A", "B", "A or B", "A and B"]
 #     return states, messages
-
-
 
 # def dis2_la():
 #     # irm-la fails? both or and xor identify the same
@@ -80,22 +77,12 @@ def crd3():
     messages = ["A", "B", "C", "A or B", "A or C", "B or C", "A or B or C"]
     return states, messages
 
-# def crd3_la():
-#     # irm-la fails
-#     letters = ["A", "B", "C"]
-#     states = gen_states(letters)
-#     messages = ["A", "B", "C",
-#     "A or B", "A xor B",
-#     "A or C", "A xor C",
-#     "B or C", "B xor C",
-#     "A or B or C", "A xor (B or C)", "A or (B xor C)", "A xor (B xor C)"]
-#     return states, messages
-
 def crd3_lu():
-    # irm-lu fails
+    # irm-lu succeeds! but only if we include last lexicon
     states, messages = crd3()
-    lexica = [{"or": "or", "and": "and"},   # L1: or = or
-              {"or": "xor", "and": "and"}]  # L2: or = xor
+    lexica = [{"or": "or", "and": "and"},
+              {"or": "xor", "and": "and"},
+              {"or": "and", "and": "and"}]
     return states, messages, lexica
 
 # basic inference: some but not all
@@ -253,21 +240,6 @@ def elipsis_lu():
     lexica = [{"some": "some", "all": "all"},
               {"some": "xsome", "all": "all"}]
     return states, messages, lexica
-
-def logical_exp_order():
-    # 1 non-probablistic irm, some-but-not-all
-    # 1 probablistic irm, some-but-not-all
-    states, messages = q1()
-    main(states, messages)
-    # irm-lu, some-but-not-all
-    states, messages, lexica = q1_lu()
-    main_lu(states, messages, lexica)
-
-# negation
-
-# def dump_latex():                                                                                                                                                                                        
-    #   to_latex(q1(), out_path='q1.tex')
-    # to_latex(suspension_lu(), out_path='suspension_lu.tex')
                       
 
 if __name__ == "__main__":
@@ -287,15 +259,14 @@ if __name__ == "__main__":
     # states, messages, lexica = neg_fc_lu()
     # states, messages, lexica = neg_fc3_lu()
     # states, messages, lexica = dis3_lu()
-    states, messages, lexica = crd2_lu()
+    # states, messages, lexica = crd2_lu()
+    # states, messages, lexica = crd3_lu()
 
-    main_lu(states, messages, lexica)
+    # main_lu(states, messages, lexica)
     
     # to_latex(suspension_lu(), out_path='suspension_lu.tex')
     # to_latex(neg_q1_lu(), out_path='neg_q1_lu.tex')
     # to_latex(neg_dis_lu(), out_path='neg_dis_lu.tex')
     # to_latex(neg_fc_lu(), out_path='neg_fc_lu.tex')
-    to_latex(crd2_lu(), out_path='crd2_lu.tex')
-    
-    # logical_exp_order()    
-    # dump_latex()
+    # to_latex(crd2_lu(), out_path='crd2_lu.tex')
+    # to_latex(crd3_lu(), out_path='crd3_lu.tex')

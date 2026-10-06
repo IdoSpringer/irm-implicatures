@@ -29,7 +29,7 @@ def gen_states_q(n):
 
 # ---------------------------------------------------------------- parser
 
-TOKEN_RE = re.compile(r"\s*(\(|\)|\bor\b|\band\b|\bxor\b|\bnot\b|\bP\d+\b|\bhit\b|\bsome\b|\bxsome\b|\ball\b|[A-Z]+)")
+TOKEN_RE = re.compile(r"\s*(\(|\)|\bor\b|\band\b|\bxor\b|\bnot\b|\bP\d+\b|\bhit\b|\bsome\b|\bxsome\b|\ball\b|\bnone\b|[A-Z]+)")
 
 def tokenize(msg):
     pos, toks = 0, []
@@ -80,6 +80,11 @@ class P:  # tiny recursive-descent parser
             if self.next() != ")":
                 raise ValueError("missing )")
             return node
+        if t in ("some", "xsome", "all", "none"):
+            # bare status predicate (state specs); "none" = negated "some"
+            if t == "none":
+                return ("not", ("some", 0))
+            return (t, 0)
         if t is not None and re.fullmatch(r"P\d+", t):
             player = int(t[1:]) - 1
             if self.peek() == "hit":
@@ -103,39 +108,61 @@ def parse(msg):
 
 SYM_RE = re.compile(r"\^|\||~")
 
+QSTATE_RE = re.compile(r"^[NSA]+$")
+
 def state_worlds(spec, letters):
-    """A state spec denotes a set of worlds (each a frozenset of letters).
+    """A state spec denotes a set of worlds (each a frozenset of letters,
+    or a (frozenset_of_letters, status_string) tuple for mixed worlds).
 
     Legacy string states like "AB" -> the single world {A, B}.
+    Legacy quantifier states like "S" or "NA" -> positional NSA string.
     Formula states like "(A ^ ~B) | (B ^ ~A)" (or with word operators
     and/or/not) -> all worlds over `letters` where the formula is true.
+    Mixed states like "B or some" -> all (letters, statuses) worlds where
+    the formula is true; statuses range over "NSA"^n with n the max
+    player index in the spec (default 1).
     """
     if spec and all(c.isalpha() and c.isupper() for c in spec):
         return [frozenset(spec)]
+    if QSTATE_RE.fullmatch(spec):
+        return [spec]
     # map symbolic operators (states only): ^ and, | or, ~ not
     spec = SYM_RE.sub(lambda m: " %s " % {"^": "and", "|": "or", "~": "not"}[m.group(0)], spec)
     ast = parse(spec)
-    return [frozenset(combo)
-            for r in range(len(letters) + 1)
-            for combo in itertools.combinations(letters, r)
-            if truth(ast, frozenset(combo))]
+    toks = tokenize(spec)
+    players = [int(t[1:]) - 1 for t in toks if re.fullmatch(r"P\d+", t)]
+    n = max(players) + 1 if players else 1
+    lit = {t for t in toks if len(t) == 1 and t.isalpha() and t.isupper()}
+    univ = list(letters) + sorted(lit - set(letters))
+    return [ (frozenset(combo), "".join(statuses))
+            for r in range(len(univ) + 1)
+            for combo in itertools.combinations(univ, r)
+            for statuses in itertools.product("NSA", repeat=n)
+            if truth(ast, (frozenset(combo), "".join(statuses)))]
 
 def satisfies(ast, worlds):
     """Does the state (set of worlds) entail the formula?"""
     return all(truth(ast, w) for w in worlds)
 
 def truth(ast, state):
-    """Is the phrase true in the state? A letter is true iff present."""
-    s = truth_state(state)
+    """Is the phrase true in the state? A letter is true iff present.
+
+    Legacy states are strings: letters are the chars of the string for
+    propositional atoms, or positional NSA chars for quantifier atoms.
+    Mixed worlds are (frozenset_of_letters, status_string) tuples.
+    """
     op = ast[0]
     if op == "lit":
-        return ast[1] in s
-    if op == "some":
-        return state[ast[1]] in "SA"
-    if op == "xsome":
-        return state[ast[1]] == "S"
-    if op == "all":
-        return state[ast[1]] == "A"
+        if isinstance(state, tuple):
+            return ast[1] in state[0]
+        return ast[1] in truth_state(state)
+    if op in ("some", "xsome", "all"):
+        statuses = state[1] if isinstance(state, tuple) else state
+        if op == "some":
+            return statuses[ast[1]] in "SA"
+        if op == "xsome":
+            return statuses[ast[1]] == "S"
+        return statuses[ast[1]] == "A"
     if op == "not":
         return not truth(ast[1], state)
     if op == "and":
@@ -167,19 +194,35 @@ def build_table(messages, states, lexicon=None, letters=None):
     if letters is None:
         letters = sorted({t for m in messages for t in tokenize(m)
                           if t.isalpha() and t.isupper() and len(t) == 1}
-                         | {c for s in states for c in s
-                            if c.isalpha() and c.isupper()} - set("NSA"))
+                         | {t for s in states for t in tokenize(SYM_RE.sub(" or ", s) if SYM_RE.search(s) else s)
+                            if len(t) == 1 and t.isalpha() and t.isupper()}
+                         - set("NSA"))
 
     def has_q(ast):
         if ast[0] in ("some", "xsome", "all"):
             return True
         return any(has_q(x) for x in ast[1:] if isinstance(x, tuple))
 
-    if any(has_q(a) for a in asts):          # quantifier messages/states
-        table = [[Fraction(1) if truth(ast, s) else Fraction(0) for ast in asts] for s in states]
-    else:                                    # propositional states = world sets
-        table = [[Fraction(1) if satisfies(ast, state_worlds(s, letters)) else Fraction(0)
-                  for ast in asts] for s in states]
+    # per-state denotation: legacy q-states stay positional strings;
+    # letter and mixed states become world sets evaluated by entailment.
+    any_q = any(has_q(a) for a in asts)
+    dens = []
+    for s in states:
+        if QSTATE_RE.fullmatch(s) and any_q:
+            dens.append(s)                       # positional NSA state
+        elif (s and all(c.isalpha() and c.isupper() for c in s)) and any_q:
+            dens.append(s)                       # legacy positional reading
+        elif s and all(c.isalpha() and c.isupper() for c in s):
+            dens.append([frozenset(s)])          # legacy letter state
+        else:
+            dens.append(state_worlds(s, letters))  # formula / mixed state
+
+    def holds(den, ast):
+        if isinstance(den, str):                 # legacy positional state
+            return truth(ast, den)
+        return satisfies(ast, den)
+
+    table = [[Fraction(1) if holds(den, ast) else Fraction(0) for ast in asts] for den in dens]
     for row in table:
         total = sum(row)
         if total > 0:

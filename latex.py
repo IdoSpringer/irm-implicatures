@@ -44,6 +44,8 @@ def _state_to_latex(state):
     Quantifier states (N/S/A strings): N -> \neg\exists, S -> (\exists \land
     \neg\forall), A -> \forall; subscripted with P_i when >1 person.
     Propositional states: ^ -> \land, | -> \lor, ~ -> \neg.
+    Mixed states: bare some/xsome/all/none keywords and "Pi hit q" atoms
+    get the same quantifier rendering, composed with the letter operators.
     """
     if _is_q_state(state):
         parts = []
@@ -58,7 +60,22 @@ def _state_to_latex(state):
                 expr += "_{P_%d}" % i
             parts.append(expr)
         return r"\(%s\)" % r" \land ".join(parts)
-    spec = (state.replace("~", r"\neg ")
+    import re as _re
+    def _q_sub(m):
+        i = m.group(1)
+        q = m.group(2)
+        expr = {"some": r"\exists", "xsome": r"(\exists \land \neg\forall)",
+                "all": r"\forall"}[q]
+        return expr + ("_{P_%s}" % i if i else "")
+    spec = _re.sub(r"\bP(\d*)\s+hit\s+(some|xsome|all)\b", _q_sub, state)
+    spec = _re.sub(r"\bnone\b", lambda m: r"\neg\exists", spec)
+    spec = _re.sub(r"\bxsome\b", lambda m: r"(\exists \land \neg\forall)", spec)
+    spec = _re.sub(r"\bsome\b", lambda m: r"\exists", spec)
+    spec = _re.sub(r"\ball\b", lambda m: r"\forall", spec)
+    spec = _re.sub(r"\bor\b", lambda m: r"\lor ", spec)
+    spec = _re.sub(r"\band\b", lambda m: r"\land ", spec)
+    spec = _re.sub(r"\bnot\b", lambda m: r"\neg ", spec)
+    spec = (spec.replace("~", r"\neg ")
                  .replace("^", r" \land ")
                  .replace("|", r" \lor "))
     return r"\(%s\)" % spec

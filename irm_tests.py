@@ -221,9 +221,9 @@ if __name__ == "__main__":
     # states, messages, lexica = crd2_lu()
     # states, messages, lexica = crd3_lu()
     # states, messages, lexica = or_some_fc_lu()
-    states, messages, lexica = ellipsis_lu()
+    # states, messages, lexica = ellipsis_lu()
 
-    main_lu(states, messages, lexica)
+    # main_lu(states, messages, lexica)
     
     # to_latex(suspension_lu(), out_path='suspension_lu.tex')
     # to_latex(neg_q1_lu(), out_path='neg_q1_lu.tex')
@@ -234,5 +234,6 @@ if __name__ == "__main__":
     # to_latex(crd2_la(), out_path='crd2_la.tex')
     # to_latex(or_some_fc(), out_path='or_some_fc.tex')
     # to_latex(or_some_fc_lu(), out_path='or_some_fc_lu.tex')
-    to_latex(ellipsis_lu(), out_path='ellipsis_lu.tex')
+    # to_latex(ellipsis_lu(), out_path='ellipsis_lu.tex')
+    pass
 

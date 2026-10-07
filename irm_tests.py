@@ -180,22 +180,23 @@ def or_some_fc_lu():
 
 # elipsis
 
-def elipsis():
+def ellipsis():
     states = gen_states_q(2)
     # we need lexical identity foe elipsis
-    # regular irm works however not sure we have all messages to create probability equality in column
-    messages = ["P1 hit some", "P1 hit all",
-                "not (P2 hit some)", "P2 hit some", "not (P2 hit all)", "P2 hit all",
-                "P1 hit some and P2 hit some", "P1 hit all and P2 hit all",
-                "P1 hit some or P2 hit some", "P1 hit all or P2 hit all",
-                "P1 hit some or not (P2 hit some)", "P1 hit all or not (P2 hit all)",
-                "P1 hit some and not (P2 hit some)", "P1 hit all and not (P2 hit all)"]
+    # regular irm works
+    # we remove alternatives without semantic identity
+    # we remove pos from neg alternatives as in negation to avoid symmetry problem
+    messages = ["P1 hit some", "P1 hit all", "not (P2 hit some)", "not (P2 hit all)",
+                "P1 hit some and not (P2 hit some)", "P1 hit some or not (P2 hit some)",
+                "P1 hit all and not (P2 hit all)", "P1 hit all or not (P2 hit all)"]
     return states, messages
 
-def elipsis_lu():
-    states, messages = elipsis()
+def ellipsis_lu():
+    # seems to work.
+    states, messages = ellipsis()
     lexica = [{"some": "some", "all": "all"},
-              {"some": "xsome", "all": "all"}]
+              {"some": "xsome", "all": "all"},
+              {"some": "all", "all": "all"}]
     return states, messages, lexica
                       
 
@@ -206,6 +207,7 @@ if __name__ == "__main__":
     # states, messages = dis3()
     # states, messages = or_some_fc()
     # states, messages = crd2_la()
+    # states, messages = ellipsis()
     
     # main(states, messages)
     
@@ -218,7 +220,8 @@ if __name__ == "__main__":
     # states, messages, lexica = dis3_lu()
     # states, messages, lexica = crd2_lu()
     # states, messages, lexica = crd3_lu()
-    states, messages, lexica = or_some_fc_lu()
+    # states, messages, lexica = or_some_fc_lu()
+    states, messages, lexica = ellipsis_lu()
 
     main_lu(states, messages, lexica)
     
@@ -231,4 +234,5 @@ if __name__ == "__main__":
     # to_latex(crd2_la(), out_path='crd2_la.tex')
     # to_latex(or_some_fc(), out_path='or_some_fc.tex')
     # to_latex(or_some_fc_lu(), out_path='or_some_fc_lu.tex')
+    to_latex(ellipsis_lu(), out_path='ellipsis_lu.tex')
 
